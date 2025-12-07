@@ -311,50 +311,6 @@ export default function QRCodeGenerator() {
                     }}
                   />
 
-                  <Grow in timeout={800}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 3,
-                        bgcolor: '#ffffff',
-                        borderRadius: 3,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'scale(1.02)',
-                          boxShadow: '0 0 40px rgba(124, 58, 237, 0.3)',
-                        },
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          inset: 0,
-                          background:
-                            'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(192, 38, 211, 0.1) 100%)',
-                          opacity: 0,
-                          transition: 'opacity 0.3s ease',
-                        },
-                        '&:hover::before': {
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={qrDataUrl}
-                        alt={`${url} için QR kodu`}
-                        style={{
-                          width: '100%',
-                          maxWidth: '280px',
-                          height: 'auto',
-                          display: 'block',
-                          position: 'relative',
-                          zIndex: 1,
-                        }}
-                      />
-                    </Paper>
-                  </Grow>
-
                   {/* Download Buttons */}
                   <Stack direction="row" spacing={2} width="100%" role="group" aria-label="İndirme seçenekleri">
                     <Button
@@ -414,6 +370,50 @@ export default function QRCodeGenerator() {
                       SVG İndir
                     </Button>
                   </Stack>
+
+                  <Grow in timeout={800}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 3,
+                        bgcolor: '#ffffff',
+                        borderRadius: 3,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'scale(1.02)',
+                          boxShadow: '0 0 40px rgba(124, 58, 237, 0.3)',
+                        },
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          inset: 0,
+                          background:
+                            'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(192, 38, 211, 0.1) 100%)',
+                          opacity: 0,
+                          transition: 'opacity 0.3s ease',
+                        },
+                        '&:hover::before': {
+                          opacity: 1,
+                        },
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={qrDataUrl}
+                        alt={`${url} için QR kodu`}
+                        style={{
+                          width: '100%',
+                          maxWidth: '280px',
+                          height: 'auto',
+                          display: 'block',
+                          position: 'relative',
+                          zIndex: 1,
+                        }}
+                      />
+                    </Paper>
+                  </Grow>
                 </Stack>
               </Fade>
             )}

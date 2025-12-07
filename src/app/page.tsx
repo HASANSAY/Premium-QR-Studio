@@ -1,4 +1,5 @@
 import QRCodeGenerator from '@/components/QRCodeGenerator';
+import ParticleBackground from '@/components/ParticleBackground';
 import { Container, Box, Typography } from '@mui/material';
 
 export default function Home() {
@@ -48,9 +49,12 @@ export default function Home() {
         }}
       />
 
-      <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
+      {/* Animated Particles */}
+      <ParticleBackground />
+
+      <Box sx={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', justifyContent: 'center' }}>
         <QRCodeGenerator />
-      </Container>
+      </Box>
 
       <Typography
         component="footer"
