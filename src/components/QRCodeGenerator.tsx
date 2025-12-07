@@ -22,6 +22,7 @@ import {
   Image as ImageIcon,
   PhotoLibrary,
   CheckCircle,
+  Style,
 } from '@mui/icons-material';
 
 export default function QRCodeGenerator() {
@@ -75,25 +76,37 @@ export default function QRCodeGenerator() {
     }
   };
 
-  const downloadQR = async (format: 'png' | 'jpeg') => {
+  const downloadQR = async (format: 'png' | 'jpeg' | 'svg') => {
     if (!qrDataUrl) return;
 
     try {
       let dataUrl = qrDataUrl;
+      let blob: Blob;
 
-      // Generate JPEG version if requested
-      if (format === 'jpeg') {
-        dataUrl = await QRCode.toDataURL(url, {
+      if (format === 'svg') {
+        // Generate SVG version
+        const svgString = await QRCode.toString(url, {
+          type: 'svg',
           width: 800,
           margin: 2,
-          type: 'image/jpeg',
           color: { dark: '#000000', light: '#ffffff' },
         });
-      }
+        blob = new Blob([svgString], { type: 'image/svg+xml' });
+      } else {
+        // Generate JPEG version if requested
+        if (format === 'jpeg') {
+          dataUrl = await QRCode.toDataURL(url, {
+            width: 800,
+            margin: 2,
+            type: 'image/jpeg',
+            color: { dark: '#000000', light: '#ffffff' },
+          });
+        }
 
-      // Convert data URL to Blob
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
+        // Convert data URL to Blob
+        const response = await fetch(dataUrl);
+        blob = await response.blob();
+      }
 
       // Create object URL from blob
       const blobUrl = URL.createObjectURL(blob);
@@ -101,7 +114,8 @@ export default function QRCodeGenerator() {
       // Create download link with proper filename
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `qrcode-${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+      const extension = format === 'jpeg' ? 'jpg' : format;
+      link.download = `qrcode-${Date.now()}.${extension}`;
       link.setAttribute('aria-label', `QR kodu ${format.toUpperCase()} olarak indir`);
 
       // Trigger download
@@ -368,6 +382,25 @@ export default function QRCodeGenerator() {
                       }}
                     >
                       JPEG İndir
+                    </Button>
+
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<Style aria-hidden="true" />}
+                      onClick={() => downloadQR('svg')}
+                      aria-label="QR kodu SVG formatında indir"
+                      sx={{
+                        py: 1.5,
+                        borderColor: 'success.main',
+                        color: 'success.light',
+                        '&:hover': {
+                          borderColor: 'success.light',
+                          bgcolor: 'rgba(46, 125, 50, 0.1)',
+                        },
+                      }}
+                    >
+                      SVG İndir
                     </Button>
                   </Stack>
                 </Stack>
