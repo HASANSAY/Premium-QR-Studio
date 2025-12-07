@@ -80,8 +80,9 @@ export default function QRCodeGenerator() {
     if (!qrDataUrl) return;
 
     try {
-      let dataUrl = qrDataUrl;
       let blob: Blob;
+      const extension = format === 'jpeg' ? 'jpg' : format;
+      const filename = `qrcode-${Date.now()}.${extension}`;
 
       if (format === 'svg') {
         // Generate SVG version
@@ -91,8 +92,10 @@ export default function QRCodeGenerator() {
           margin: 2,
           color: { dark: '#000000', light: '#ffffff' },
         });
-        blob = new Blob([svgString], { type: 'image/svg+xml' });
+        blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
       } else {
+        let dataUrl = qrDataUrl;
+
         // Generate JPEG version if requested
         if (format === 'jpeg') {
           dataUrl = await QRCode.toDataURL(url, {
@@ -103,30 +106,38 @@ export default function QRCodeGenerator() {
           });
         }
 
-        // Convert data URL to Blob
+        // Convert data URL to Blob with explicit MIME type
         const response = await fetch(dataUrl);
-        blob = await response.blob();
+        const arrayBuffer = await response.arrayBuffer();
+        const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        blob = new Blob([arrayBuffer], { type: mimeType });
       }
 
-      // Create object URL from blob
-      const blobUrl = URL.createObjectURL(blob);
+      // Use a more robust download method
+      if (window.navigator && (window.navigator as any).msSaveOrOpenBlob) {
+        // For IE
+        (window.navigator as any).msSaveOrOpenBlob(blob, filename);
+      } else {
+        // For modern browsers
+        const link = document.createElement('a');
+        const blobUrl = URL.createObjectURL(blob);
 
-      // Create download link with proper filename
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      const extension = format === 'jpeg' ? 'jpg' : format;
-      link.download = `qrcode-${Date.now()}.${extension}`;
-      link.setAttribute('aria-label', `QR kodu ${format.toUpperCase()} olarak indir`);
+        link.href = blobUrl;
+        link.download = filename;
+        link.style.display = 'none';
 
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
+        // Ensure the link is in the document
+        document.body.appendChild(link);
 
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(blobUrl);
-      }, 100);
+        // Trigger click
+        link.click();
+
+        // Cleanup with longer delay to ensure download starts
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 250);
+      }
     } catch (error) {
       console.error('Download error:', error);
       setError('İndirme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
