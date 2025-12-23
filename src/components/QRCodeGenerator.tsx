@@ -360,7 +360,7 @@ export default function QRCodeGenerator() {
                     size="large"
                     fullWidth
                     onClick={generateQR}
-                    disabled={loading}
+                    disabled={loading || (tabValue === 'url' && (!qrValue || !isValidUrl(qrValue)))}
                     sx={{
                       py: 2,
                       fontSize: '1.2rem',
@@ -368,6 +368,11 @@ export default function QRCodeGenerator() {
                       textTransform: 'none',
                       boxShadow: '0 10px 20px rgba(124, 58, 237, 0.3)',
                       transition: '0.3s',
+                      '&:disabled': {
+                        bgcolor: 'rgba(124, 58, 237, 0.12)',
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        boxShadow: 'none',
+                      },
                       '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 15px 30px rgba(124, 58, 237, 0.5)' }
                     }}
                   >
