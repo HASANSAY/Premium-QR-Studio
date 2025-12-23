@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import QRCode from 'qrcode';
+import React, { useState, useRef, useEffect } from 'react';
+import { QRCode } from 'react-qrcode-logo';
+import QRCodeLib from 'qrcode';
 import {
   Card,
   CardContent,
@@ -15,6 +16,9 @@ import {
   Paper,
   Alert,
   InputAdornment,
+  Tabs,
+  Tab,
+  MenuItem,
 } from '@mui/material';
 import {
   QrCode2,
@@ -23,14 +27,59 @@ import {
   PhotoLibrary,
   CheckCircle,
   Style,
+  Wifi,
+  ContactPhone,
+  Email,
+  Sms,
+  Phone,
+  TextSnippet,
 } from '@mui/icons-material';
+import {
+  QRType,
+  WiFiData,
+  VCardData,
+  EmailData,
+  SMSData,
+  getQRData
+} from '@/utils/qrHelpers';
 
 export default function QRCodeGenerator() {
-  const [url, setUrl] = useState('');
+  const [tabValue, setTabValue] = useState<QRType>('url');
+  const [qrValue, setQrValue] = useState('');
+  const [qrData, setQrData] = useState<any>('');
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [urlGenerated, setUrlGenerated] = useState(false); // New state
+
+  // Form States
+  const [wifiData, setWifiData] = useState<WiFiData>({ ssid: '', password: '', security: 'WPA', hidden: false });
+  const [vCardData, setVCardData] = useState<VCardData>({ firstName: '', lastName: '', phone: '', email: '' });
+  const [emailData, setEmailData] = useState<EmailData>({ email: '', subject: '', body: '' });
+  const [smsData, setSmsData] = useState<SMSData>({ phone: '', message: '' });
+  const [phoneData, setPhoneData] = useState('');
+  const [textData, setTextData] = useState('');
+
+  // Customization States
+  const [fgColor, setFgColor] = useState('#000000');
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoOpacity, setLogoOpacity] = useState(1);
+  const [logoSize, setLogoSize] = useState(60);
+
+  const qrRef = useRef<any>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // URL Validation
   const isValidUrl = (urlString: string): boolean => {
@@ -42,13 +91,46 @@ export default function QRCodeGenerator() {
     }
   };
 
+  const updateQRValue = () => {
+    if (tabValue === 'url') return; // Don't update automatically for URL
+
+    let data = '';
+    switch (tabValue) {
+      case 'wifi': data = getQRData('wifi', wifiData); break;
+      case 'vcard': data = getQRData('vcard', vCardData); break;
+      case 'email': data = getQRData('email', emailData); break;
+      case 'phone': data = getQRData('phone', phoneData); break;
+      case 'sms': data = getQRData('sms', smsData); break;
+    }
+    setQrData(data);
+  };
+
+  useEffect(() => {
+    updateQRValue();
+  }, [tabValue, wifiData, vCardData, emailData, smsData, phoneData, textData]);
+
+  // History State
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('qr_history');
+    if (savedHistory) setHistory(JSON.parse(savedHistory));
+  }, []);
+
+  const addToHistory = (type: QRType, data: string) => {
+    const newItem = { id: Date.now(), type, data, timestamp: new Date().toISOString() };
+    const updatedHistory = [newItem, ...history.filter(item => item.data !== data)].slice(0, 5);
+    setHistory(updatedHistory);
+    localStorage.setItem('qr_history', JSON.stringify(updatedHistory));
+  };
+
   const generateQR = async () => {
-    if (!url.trim()) {
+    if (tabValue === 'url' && !qrValue.trim()) {
       setError('Lütfen bir bağlantı girin');
       return;
     }
 
-    if (!isValidUrl(url)) {
+    if (tabValue === 'url' && !isValidUrl(qrValue)) {
       setError('Lütfen geçerli bir URL girin (örn: https://example.com)');
       return;
     }
@@ -58,106 +140,66 @@ export default function QRCodeGenerator() {
     setSuccess(false);
 
     try {
-      const dataUrl = await QRCode.toDataURL(url, {
-        width: 800,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#ffffff',
-        },
-      });
-      setQrDataUrl(dataUrl);
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      const finalData = tabValue === 'url' ? qrValue : qrData;
+      if (tabValue === 'url') {
+        setQrData(qrValue);
+        setUrlGenerated(true);
+      }
+
+      addToHistory(tabValue, finalData);
       setSuccess(true);
     } catch (err) {
       console.error('QR Code generation error:', err);
-      setError('QR Kod oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
+      setError('QR Kod oluşturulurken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadQR = async (format: 'png' | 'jpeg' | 'svg') => {
-    if (!qrDataUrl) return;
+  const downloadQR = async (format: 'png' | 'jpg' | 'svg') => {
+    if (!qrRef.current) return;
 
     try {
-      let blob: Blob;
-      const extension = format === 'jpeg' ? 'jpg' : format;
-      const filename = `qrcode-${Date.now()}.${extension}`;
-
       if (format === 'svg') {
-        // Generate SVG version
-        const svgString = await QRCode.toString(url, {
+        const svgString = await QRCodeLib.toString(qrData, {
           type: 'svg',
           width: 800,
           margin: 2,
-          color: { dark: '#000000', light: '#ffffff' },
+          color: { dark: fgColor, light: bgColor }, // Use custom colors even in SVG
         });
-        blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      } else {
-        let dataUrl = qrDataUrl;
-
-        // Generate JPEG version if requested
-        if (format === 'jpeg') {
-          dataUrl = await QRCode.toDataURL(url, {
-            width: 800,
-            margin: 2,
-            type: 'image/jpeg',
-            color: { dark: '#000000', light: '#ffffff' },
-          });
-        }
-
-        // Convert data URL to Blob with explicit MIME type
-        const response = await fetch(dataUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-        blob = new Blob([arrayBuffer], { type: mimeType });
-      }
-
-      // Use a more robust download method
-      if (window.navigator && (window.navigator as any).msSaveOrOpenBlob) {
-        // For IE
-        (window.navigator as any).msSaveOrOpenBlob(blob, filename);
-      } else {
-        // For modern browsers
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const blobUrl = URL.createObjectURL(blob);
-
-        link.href = blobUrl;
-        link.download = filename;
-        link.style.display = 'none';
-
-        // Ensure the link is in the document
-        document.body.appendChild(link);
-
-        // Trigger click
+        link.href = url;
+        link.download = `qrcode-${Date.now()}.svg`;
         link.click();
-
-        // Cleanup with longer delay to ensure download starts
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(blobUrl);
-        }, 250);
+        URL.revokeObjectURL(url);
+      } else {
+        // react-qrcode-logo uses 'png' or 'jpg'
+        qrRef.current.download(format, `qrcode-${Date.now()}`);
       }
     } catch (error) {
       console.error('Download error:', error);
-      setError('İndirme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      setError('İndirme sırasında bir hata oluştu.');
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !loading && url) {
-      generateQR();
-    }
+  const handleTabChange = (event: React.SyntheticEvent, newValue: QRType) => {
+    setTabValue(newValue);
+    setError(null);
+    setSuccess(false);
+    if (newValue === 'url') setUrlGenerated(false); // Reset for URL tab
   };
 
   return (
     <Fade in timeout={800}>
       <Card
         component="section"
-        aria-labelledby="qr-generator-title"
         sx={{
           width: '100%',
-          maxWidth: 600,
+          maxWidth: 800,
           position: 'relative',
           overflow: 'visible',
           '&::before': {
@@ -171,251 +213,327 @@ export default function QRCodeGenerator() {
             backgroundSize: '200% 100%',
             animation: 'gradient 3s ease infinite',
           },
-          '@keyframes gradient': {
-            '0%, 100%': { backgroundPosition: '0% 50%' },
-            '50%': { backgroundPosition: '100% 50%' },
-          },
         }}
       >
-        <CardContent sx={{ p: 4 }}>
-          <Stack spacing={4} alignItems="center">
+        <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+          <Stack spacing={4}>
             {/* Header */}
             <Box textAlign="center">
-              <Grow in timeout={1000}>
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    p: 2,
-                    borderRadius: '50%',
-                    bgcolor: 'rgba(124, 58, 237, 0.1)',
-                    mb: 2,
-                  }}
-                  role="img"
-                  aria-label="QR kod simgesi"
-                >
-                  <QrCode2 sx={{ fontSize: 48, color: 'primary.main' }} aria-hidden="true" />
-                </Box>
-              </Grow>
-              <Typography
-                id="qr-generator-title"
-                variant="h1"
-                component="h1"
-                sx={{ mb: 1, fontSize: { xs: '2rem', md: '2.5rem' } }}
-              >
-                QR Oluşturucu
+              <Typography variant="h4" component="h1" gutterBottom fontWeight="800" sx={{ color: 'white' }}>
+                Premium QR Studio
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Bağlantınızı saniyeler içinde QR koda dönüştürün
+              <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                Tüm ihtiyaçlarınız için profesyonel QR kodları oluşturun
               </Typography>
             </Box>
 
-            {/* Error Alert */}
-            {error && (
-              <Fade in>
-                <Alert
-                  severity="error"
-                  onClose={() => setError(null)}
-                  sx={{ width: '100%' }}
-                  role="alert"
-                >
-                  {error}
-                </Alert>
-              </Fade>
-            )}
+            {/* Type Selection Tabs */}
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                borderBottom: 1,
+                borderColor: 'divider',
+                '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' }
+              }}
+            >
+              <Tab icon={<LinkIcon />} label="URL" value="url" />
+              <Tab icon={<Wifi />} label="WiFi" value="wifi" />
+              <Tab icon={<ContactPhone />} label="VCard" value="vcard" />
+              <Tab icon={<Email />} label="Email" value="email" />
+              <Tab icon={<Phone />} label="Telefon" value="phone" />
+              <Tab icon={<Sms />} label="SMS" value="sms" />
+            </Tabs>
 
-            {/* Success Alert */}
-            {success && !error && (
-              <Fade in>
-                <Alert
-                  severity="success"
-                  icon={<CheckCircle />}
-                  sx={{ width: '100%' }}
-                  role="status"
-                >
-                  QR Kod başarıyla oluşturuldu!
-                </Alert>
-              </Fade>
-            )}
+            {/* Form and Customization Section */}
+            <Stack spacing={6} alignItems="center">
+              {/* Main Input Area - Centered and Larger */}
+              <Box sx={{ width: '100%', maxWidth: 650 }}>
+                {error && (
+                  <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
+                    {error}
+                  </Alert>
+                )}
 
-            {/* Input Section */}
-            <Stack spacing={3} width="100%" component="form" onSubmit={(e) => { e.preventDefault(); generateQR(); }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="https://web-siteniz.com"
-                value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value);
-                  setError(null);
-                  setSuccess(false);
-                }}
-                onKeyPress={handleKeyPress}
-                error={!!error}
-                disabled={loading}
-                inputProps={{
-                  'aria-label': 'Web sitesi bağlantısı',
-                  'aria-describedby': 'url-helper-text',
-                  type: 'url',
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LinkIcon sx={{ color: error ? 'error.main' : 'primary.main' }} aria-hidden="true" />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    fontSize: '1rem',
-                    py: 0.5,
-                  },
-                }}
-              />
-              <Typography
-                id="url-helper-text"
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: -2, display: 'block', textAlign: 'left' }}
-              >
-                Örnek: https://www.google.com
-              </Typography>
+                {success && (
+                  <Alert severity="success" sx={{ mb: 3 }}>
+                    QR Kodunuz hazır! Aşağıdan ince ayarlayıp indirebilirsiniz.
+                  </Alert>
+                )}
 
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                fullWidth
-                onClick={generateQR}
-                disabled={loading || !url}
-                startIcon={loading ? null : <QrCode2 />}
-                aria-label={loading ? 'QR kod oluşturuluyor' : 'QR kod oluştur'}
-                sx={{
-                  py: 1.5,
-                  fontSize: '1.1rem',
-                }}
-              >
-                {loading ? 'Oluşturuluyor...' : 'QR Kod Oluştur'}
-              </Button>
-            </Stack>
+                {/* Dynamic Form Content */}
+                <Stack spacing={4}>
+                  {tabValue === 'url' && (
+                    <TextField
+                      fullWidth
+                      label="Web Sitesi Adresi"
+                      placeholder="https://example.com"
+                      value={qrValue}
+                      onChange={(e) => setQrValue(e.target.value)}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: '1.2rem',
+                          p: 1.5,
+                          borderRadius: 3,
+                          bgcolor: 'rgba(255,255,255,0.03)',
+                        }
+                      }}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start"><LinkIcon color="primary" sx={{ fontSize: 28 }} /></InputAdornment>,
+                      }}
+                    />
+                  )}
 
-            {/* QR Code Display */}
-            {qrDataUrl && (
-              <Fade in timeout={600}>
-                <Stack spacing={3} width="100%" alignItems="center" sx={{ pt: 2 }} role="region" aria-label="Oluşturulan QR kod">
-                  <Box
+                  {tabValue === 'wifi' && (
+                    <Stack spacing={2} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
+                      <TextField
+                        fullWidth
+                        label="Ağ Adı (SSID)"
+                        value={wifiData.ssid}
+                        onChange={(e) => setWifiData({ ...wifiData, ssid: e.target.value })}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Şifre"
+                        type="password"
+                        value={wifiData.password}
+                        onChange={(e) => setWifiData({ ...wifiData, password: e.target.value })}
+                      />
+                      <TextField
+                        select
+                        fullWidth
+                        label="Güvenlik Tipi"
+                        value={wifiData.security}
+                        onChange={(e) => setWifiData({ ...wifiData, security: e.target.value as any })}
+                      >
+                        <MenuItem value="WPA">WPA/WPA2</MenuItem>
+                        <MenuItem value="WEP">WEP</MenuItem>
+                        <MenuItem value="nopass">Şifresiz</MenuItem>
+                      </TextField>
+                    </Stack>
+                  )}
+
+                  {/* ... other tabs remain same but with consistent styling ... */}
+                  {tabValue === 'vcard' && (
+                    <Stack spacing={2} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
+                      <Stack direction="row" spacing={2}>
+                        <TextField fullWidth label="Ad" value={vCardData.firstName} onChange={(e) => setVCardData({ ...vCardData, firstName: e.target.value })} />
+                        <TextField fullWidth label="Soyad" value={vCardData.lastName} onChange={(e) => setVCardData({ ...vCardData, lastName: e.target.value })} />
+                      </Stack>
+                      <TextField fullWidth label="Telefon" value={vCardData.phone} onChange={(e) => setVCardData({ ...vCardData, phone: e.target.value })} />
+                      <TextField fullWidth label="E-posta" value={vCardData.email} onChange={(e) => setVCardData({ ...vCardData, email: e.target.value })} />
+                    </Stack>
+                  )}
+
+                  {tabValue === 'email' && (
+                    <Stack spacing={2} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
+                      <TextField fullWidth label="Alıcı E-posta" value={emailData.email} onChange={(e) => setEmailData({ ...emailData, email: e.target.value })} />
+                      <TextField fullWidth label="Konu" value={emailData.subject} onChange={(e) => setEmailData({ ...emailData, subject: e.target.value })} />
+                      <TextField fullWidth multiline rows={3} label="Mesaj" value={emailData.body} onChange={(e) => setEmailData({ ...emailData, body: e.target.value })} />
+                    </Stack>
+                  )}
+
+                  {tabValue === 'phone' && (
+                    <TextField
+                      fullWidth
+                      label="Telefon Numarası"
+                      value={phoneData}
+                      onChange={(e) => setPhoneData(e.target.value)}
+                      sx={{ '& .MuiOutlinedInput-root': { fontSize: '1.2rem', p: 1.5, borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: <InputAdornment position="start"><Phone color="primary" sx={{ fontSize: 28 }} /></InputAdornment>,
+                      }}
+                    />
+                  )}
+
+                  {tabValue === 'sms' && (
+                    <Stack spacing={2} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}>
+                      <TextField fullWidth label="Telefon Numarası" value={smsData.phone} onChange={(e) => setSmsData({ ...smsData, phone: e.target.value })} />
+                      <TextField fullWidth multiline rows={2} label="Mesaj" value={smsData.message} onChange={(e) => setSmsData({ ...smsData, message: e.target.value })} />
+                    </Stack>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    onClick={generateQR}
+                    disabled={loading}
                     sx={{
-                      borderTop: '1px solid',
-                      borderColor: 'rgba(255, 255, 255, 0.1)',
-                      width: '100%',
-                      mb: 2,
+                      py: 2,
+                      fontSize: '1.2rem',
+                      borderRadius: 4,
+                      textTransform: 'none',
+                      boxShadow: '0 10px 20px rgba(124, 58, 237, 0.3)',
+                      transition: '0.3s',
+                      '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 15px 30px rgba(124, 58, 237, 0.5)' }
                     }}
-                  />
+                  >
+                    {loading ? 'İşleniyor...' : (tabValue === 'url' ? 'QR Oluştur' : 'Önizlemeyi Güncelle')}
+                  </Button>
+                </Stack>
+              </Box>
 
-                  {/* Download Buttons */}
-                  <Stack direction="row" spacing={2} width="100%" role="group" aria-label="İndirme seçenekleri">
+              {/* Customization Section (Horizontal on Desktop) */}
+              <Box sx={{ width: '100%', pt: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <Typography variant="subtitle1" gutterBottom fontWeight="700" textAlign="center" sx={{ mb: 3 }}>
+                  Tasarımı Özelleştir
+                </Typography>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} justifyContent="center" alignItems="center">
+                  <Box sx={{ display: 'flex', gap: 3 }}>
+                    <Box textAlign="center">
+                      <Typography variant="caption" color="text.secondary">QR Rengi</Typography>
+                      <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
+                        <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
+                      </Box>
+                    </Box>
+                    <Box textAlign="center">
+                      <Typography variant="caption" color="text.secondary">Arkaplan</Typography>
+                      <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
+                        <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  <Box>
                     <Button
                       variant="outlined"
+                      component="label"
+                      startIcon={<PhotoLibrary />}
+                      sx={{ borderRadius: 3, px: 4, py: 1.2, borderStyle: 'dashed' }}
+                    >
+                      Logo Yükle
+                      <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
+                    </Button>
+                    {logoBase64 && (
+                      <Typography
+                        variant="caption"
+                        onClick={() => setLogoBase64(null)}
+                        sx={{ display: 'block', textAlign: 'center', mt: 1, color: 'error.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        Logoyu Kaldır
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
+              </Box>
+            </Stack>
+
+            {/* Display Section: Hidden for URL until created */}
+            {(tabValue !== 'url' || urlGenerated) && (
+              <Fade in>
+                <Stack spacing={4} alignItems="center" sx={{ mt: 6, pt: 6, borderTop: '2px solid rgba(124, 58, 237, 0.2)' }}>
+                  {/* Download Buttons */}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ maxWidth: 600 }}>
+                    <Button
                       fullWidth
-                      startIcon={<ImageIcon aria-hidden="true" />}
+                      variant="contained"
+                      color="primary"
+                      startIcon={<ImageIcon />}
                       onClick={() => downloadQR('png')}
-                      aria-label="QR kodu PNG formatında indir"
-                      sx={{
-                        py: 1.5,
-                        borderColor: 'primary.main',
-                        color: 'primary.light',
-                        '&:hover': {
-                          borderColor: 'primary.light',
-                          bgcolor: 'rgba(124, 58, 237, 0.1)',
-                        },
-                      }}
+                      sx={{ py: 1.5, borderRadius: 3 }}
                     >
                       PNG İndir
                     </Button>
-
                     <Button
-                      variant="outlined"
                       fullWidth
-                      startIcon={<PhotoLibrary aria-hidden="true" />}
-                      onClick={() => downloadQR('jpeg')}
-                      aria-label="QR kodu JPEG formatında indir"
-                      sx={{
-                        py: 1.5,
-                        borderColor: 'secondary.main',
-                        color: 'secondary.light',
-                        '&:hover': {
-                          borderColor: 'secondary.light',
-                          bgcolor: 'rgba(192, 38, 211, 0.1)',
-                        },
-                      }}
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<PhotoLibrary />}
+                      onClick={() => downloadQR('jpg')}
+                      sx={{ py: 1.5, borderRadius: 3 }}
                     >
-                      JPEG İndir
+                      JPG İndir
                     </Button>
-
                     <Button
-                      variant="outlined"
                       fullWidth
-                      startIcon={<Style aria-hidden="true" />}
+                      variant="contained"
+                      color="success"
+                      startIcon={<Style />}
                       onClick={() => downloadQR('svg')}
-                      aria-label="QR kodu SVG formatında indir"
-                      sx={{
-                        py: 1.5,
-                        borderColor: 'success.main',
-                        color: 'success.light',
-                        '&:hover': {
-                          borderColor: 'success.light',
-                          bgcolor: 'rgba(46, 125, 50, 0.1)',
-                        },
-                      }}
+                      sx={{ py: 1.5, borderRadius: 3 }}
                     >
                       SVG İndir
                     </Button>
                   </Stack>
 
-                  <Grow in timeout={800}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 3,
-                        bgcolor: '#ffffff',
-                        borderRadius: 3,
-                        position: 'relative',
-                        overflow: 'hidden',
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'scale(1.02)',
-                          boxShadow: '0 0 40px rgba(124, 58, 237, 0.3)',
-                        },
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          inset: 0,
-                          background:
-                            'linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(192, 38, 211, 0.1) 100%)',
-                          opacity: 0,
-                          transition: 'opacity 0.3s ease',
-                        },
-                        '&:hover::before': {
-                          opacity: 1,
-                        },
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={qrDataUrl}
-                        alt={`${url} için QR kodu`}
-                        style={{
-                          width: '100%',
-                          maxWidth: '280px',
-                          height: 'auto',
-                          display: 'block',
-                          position: 'relative',
-                          zIndex: 1,
-                        }}
-                      />
-                    </Paper>
-                  </Grow>
+                  {/* QR Image */}
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      bgcolor: bgColor,
+                      borderRadius: 6,
+                      boxShadow: '0 30px 60px rgba(0,0,0,0.5)',
+                      transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      '&:hover': { transform: 'scale(1.05) rotate(1deg)' }
+                    }}
+                  >
+                    <QRCode
+                      ref={qrRef}
+                      value={qrData || 'Premium QR Studio'}
+                      size={300}
+                      quietZone={10}
+                      qrStyle="squares"
+                      eyeRadius={12}
+                      fgColor={fgColor}
+                      bgColor={bgColor}
+                      logoImage={logoBase64 || undefined}
+                      logoWidth={logoSize}
+                      logoOpacity={logoOpacity}
+                      removeQrCodeBehindLogo={true}
+                    />
+                  </Paper>
                 </Stack>
               </Fade>
+            )}
+
+            {/* History Section */}
+            {history.length > 0 && (
+              <Box sx={{ mt: 4, pt: 4, borderTop: '1px dotted rgba(255,255,255,0.1)' }}>
+                <Typography variant="overline" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  Son Oluşturulanlar
+                </Typography>
+                <Stack spacing={1}>
+                  {history.map((item) => (
+                    <Paper
+                      key={item.id}
+                      onClick={() => {
+                        setTabValue(item.type);
+                        setQrData(item.data);
+                        setSuccess(true);
+                      }}
+                      sx={{
+                        p: 1.5,
+                        bgcolor: 'rgba(255,255,255,0.03)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: '0.2s',
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' }
+                      }}
+                    >
+                      <Stack direction="row" spacing={2} alignItems="center">
+                        <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'rgba(124, 58, 237, 0.2)' }}>
+                          <QrCode2 sx={{ fontSize: 20, color: 'primary.light' }} />
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" fontWeight="600">{item.type.toUpperCase()}</Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.data}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(item.timestamp).toLocaleTimeString()}
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Stack>
+              </Box>
             )}
           </Stack>
         </CardContent>
