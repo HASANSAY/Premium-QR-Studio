@@ -51,7 +51,7 @@ export default function QRCodeGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [urlGenerated, setUrlGenerated] = useState(false); // New state
+  const [isGenerated, setIsGenerated] = useState(false);
 
   // Form States
   const [wifiData, setWifiData] = useState<WiFiData>({ ssid: '', password: '', security: 'WPA', hidden: false });
@@ -60,54 +60,6 @@ export default function QRCodeGenerator() {
   const [smsData, setSmsData] = useState<SMSData>({ phone: '', message: '' });
   const [phoneData, setPhoneData] = useState('');
   const [textData, setTextData] = useState('');
-
-  // Customization States
-  const [fgColor, setFgColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#ffffff');
-  const [logoBase64, setLogoBase64] = useState<string | null>(null);
-  const [logoOpacity, setLogoOpacity] = useState(1);
-  const [logoSize, setLogoSize] = useState(60);
-
-  const qrRef = useRef<any>(null);
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // URL Validation
-  const isValidUrl = (urlString: string): boolean => {
-    try {
-      const urlObj = new URL(urlString);
-      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const updateQRValue = () => {
-    if (tabValue === 'url') return; // Don't update automatically for URL
-
-    let data = '';
-    switch (tabValue) {
-      case 'wifi': data = getQRData('wifi', wifiData); break;
-      case 'vcard': data = getQRData('vcard', vCardData); break;
-      case 'email': data = getQRData('email', emailData); break;
-      case 'phone': data = getQRData('phone', phoneData); break;
-      case 'sms': data = getQRData('sms', smsData); break;
-    }
-    setQrData(data);
-  };
-
-  useEffect(() => {
-    updateQRValue();
-  }, [tabValue, wifiData, vCardData, emailData, smsData, phoneData, textData]);
 
   // History State
   const [history, setHistory] = useState<any[]>([]);
@@ -123,6 +75,18 @@ export default function QRCodeGenerator() {
     setHistory(updatedHistory);
     localStorage.setItem('qr_history', JSON.stringify(updatedHistory));
   };
+
+  // URL Validation
+  const isValidUrl = (urlString: string): boolean => {
+    try {
+      const urlObj = new URL(urlString);
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+
 
   const generateQR = async () => {
     if (tabValue === 'url' && !qrValue.trim()) {
@@ -142,12 +106,21 @@ export default function QRCodeGenerator() {
     try {
       await new Promise(resolve => setTimeout(resolve, 600));
 
-      const finalData = tabValue === 'url' ? qrValue : qrData;
+      let finalData = '';
       if (tabValue === 'url') {
-        setQrData(qrValue);
-        setUrlGenerated(true);
+        finalData = qrValue;
+      } else {
+        switch (tabValue) {
+          case 'wifi': finalData = getQRData('wifi', wifiData); break;
+          case 'vcard': finalData = getQRData('vcard', vCardData); break;
+          case 'email': finalData = getQRData('email', emailData); break;
+          case 'phone': finalData = getQRData('phone', phoneData); break;
+          case 'sms': finalData = getQRData('sms', smsData); break;
+        }
       }
 
+      setQrData(finalData);
+      setIsGenerated(true);
       addToHistory(tabValue, finalData);
       setSuccess(true);
     } catch (err) {
@@ -158,39 +131,12 @@ export default function QRCodeGenerator() {
     }
   };
 
-  const downloadQR = async (format: 'png' | 'jpg' | 'svg') => {
-    if (!qrRef.current) return;
-
-    try {
-      if (format === 'svg') {
-        const svgString = await QRCodeLib.toString(qrData, {
-          type: 'svg',
-          width: 800,
-          margin: 2,
-          color: { dark: fgColor, light: bgColor }, // Use custom colors even in SVG
-        });
-        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `qrcode-${Date.now()}.svg`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else {
-        // react-qrcode-logo uses 'png' or 'jpg'
-        qrRef.current.download(format, `qrcode-${Date.now()}`);
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      setError('İndirme sırasında bir hata oluştu.');
-    }
-  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: QRType) => {
     setTabValue(newValue);
     setError(null);
     setSuccess(false);
-    if (newValue === 'url') setUrlGenerated(false); // Reset for URL tab
+    setIsGenerated(false); // Reset for all tabs
   };
 
   return (
@@ -231,8 +177,7 @@ export default function QRCodeGenerator() {
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
+              centered
               sx={{
                 borderBottom: 1,
                 borderColor: 'divider',
@@ -240,11 +185,10 @@ export default function QRCodeGenerator() {
               }}
             >
               <Tab icon={<LinkIcon />} label="URL" value="url" />
-              <Tab icon={<Wifi />} label="WiFi" value="wifi" />
-              <Tab icon={<ContactPhone />} label="VCard" value="vcard" />
-              <Tab icon={<Email />} label="Email" value="email" />
-              <Tab icon={<Phone />} label="Telefon" value="phone" />
-              <Tab icon={<Sms />} label="SMS" value="sms" />
+              <Tab icon={<Phone sx={{ fontSize: 20 }} />} label="Telefon" value="phone" />
+              <Tab icon={<ContactPhone sx={{ fontSize: 20 }} />} label="VCard" value="vcard" />
+              <Tab icon={<Sms sx={{ fontSize: 20 }} />} label="SMS" value="sms" />
+              <Tab icon={<Wifi sx={{ fontSize: 20 }} />} label="WiFi" value="wifi" />
             </Tabs>
 
             {/* Form and Customization Section */}
@@ -376,123 +320,15 @@ export default function QRCodeGenerator() {
                       '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 15px 30px rgba(124, 58, 237, 0.5)' }
                     }}
                   >
-                    {loading ? 'İşleniyor...' : (tabValue === 'url' ? 'QR Oluştur' : 'Önizlemeyi Güncelle')}
+                    {loading ? 'İşleniyor...' : (tabValue === 'url' ? 'QR Oluştur' : 'QR OLUŞTUR')}
                   </Button>
-                </Stack>
-              </Box>
-
-              {/* Customization Section (Horizontal on Desktop) */}
-              <Box sx={{ width: '100%', pt: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <Typography variant="subtitle1" gutterBottom fontWeight="700" textAlign="center" sx={{ mb: 3 }}>
-                  Tasarımı Özelleştir
-                </Typography>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} justifyContent="center" alignItems="center">
-                  <Box sx={{ display: 'flex', gap: 3 }}>
-                    <Box textAlign="center">
-                      <Typography variant="caption" color="text.secondary">QR Rengi</Typography>
-                      <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
-                        <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
-                      </Box>
-                    </Box>
-                    <Box textAlign="center">
-                      <Typography variant="caption" color="text.secondary">Arkaplan</Typography>
-                      <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
-                        <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  <Box>
-                    <Button
-                      variant="outlined"
-                      component="label"
-                      startIcon={<PhotoLibrary />}
-                      sx={{ borderRadius: 3, px: 4, py: 1.2, borderStyle: 'dashed' }}
-                    >
-                      Logo Yükle
-                      <input type="file" hidden accept="image/*" onChange={handleLogoUpload} />
-                    </Button>
-                    {logoBase64 && (
-                      <Typography
-                        variant="caption"
-                        onClick={() => setLogoBase64(null)}
-                        sx={{ display: 'block', textAlign: 'center', mt: 1, color: 'error.main', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                      >
-                        Logoyu Kaldır
-                      </Typography>
-                    )}
-                  </Box>
                 </Stack>
               </Box>
             </Stack>
 
-            {/* Display Section: Hidden for URL until created */}
-            {(tabValue !== 'url' || urlGenerated) && (
-              <Fade in>
-                <Stack spacing={4} alignItems="center" sx={{ mt: 6, pt: 6, borderTop: '2px solid rgba(124, 58, 237, 0.2)' }}>
-                  {/* Download Buttons */}
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ maxWidth: 600 }}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="primary"
-                      startIcon={<ImageIcon />}
-                      onClick={() => downloadQR('png')}
-                      sx={{ py: 1.5, borderRadius: 3 }}
-                    >
-                      PNG İndir
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="secondary"
-                      startIcon={<PhotoLibrary />}
-                      onClick={() => downloadQR('jpg')}
-                      sx={{ py: 1.5, borderRadius: 3 }}
-                    >
-                      JPG İndir
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="success"
-                      startIcon={<Style />}
-                      onClick={() => downloadQR('svg')}
-                      sx={{ py: 1.5, borderRadius: 3 }}
-                    >
-                      SVG İndir
-                    </Button>
-                  </Stack>
-
-                  {/* QR Image */}
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 4,
-                      bgcolor: bgColor,
-                      borderRadius: 6,
-                      boxShadow: '0 30px 60px rgba(0,0,0,0.5)',
-                      transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                      '&:hover': { transform: 'scale(1.05) rotate(1deg)' }
-                    }}
-                  >
-                    <QRCode
-                      ref={qrRef}
-                      value={qrData || 'Premium QR Studio'}
-                      size={300}
-                      quietZone={10}
-                      qrStyle="squares"
-                      eyeRadius={12}
-                      fgColor={fgColor}
-                      bgColor={bgColor}
-                      logoImage={logoBase64 || undefined}
-                      logoWidth={logoSize}
-                      logoOpacity={logoOpacity}
-                      removeQrCodeBehindLogo={true}
-                    />
-                  </Paper>
-                </Stack>
-              </Fade>
+            {/* Display and Customization Section - Isolated for Performance */}
+            {isGenerated && (
+              <QRPreviewSection qrData={qrData} />
             )}
 
             {/* History Section */}
@@ -543,6 +379,103 @@ export default function QRCodeGenerator() {
           </Stack>
         </CardContent>
       </Card>
+    </Fade>
+  );
+}
+
+// --- Isolated Preview Component for Performance ---
+function QRPreviewSection({ qrData }: { qrData: string }) {
+  const [fgColor, setFgColor] = useState('#000000');
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const qrRef = useRef<any>(null);
+
+  const downloadQR = async (format: 'png' | 'jpg' | 'svg') => {
+    if (!qrRef.current) return;
+
+    try {
+      if (format === 'svg') {
+        const svgString = await QRCodeLib.toString(qrData, {
+          type: 'svg',
+          width: 800,
+          margin: 2,
+          color: { dark: fgColor, light: bgColor },
+        });
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qrcode-${Date.now()}.svg`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        qrRef.current.download(format, `qrcode-${Date.now()}`);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+    }
+  };
+
+  return (
+    <Fade in>
+      <Stack spacing={4} alignItems="center" sx={{ mt: 6, pt: 6, borderTop: '2px solid rgba(124, 58, 237, 0.2)' }}>
+        {/* Download Buttons */}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ maxWidth: 600 }}>
+          <Button fullWidth variant="contained" color="primary" startIcon={<ImageIcon />} onClick={() => downloadQR('png')} sx={{ py: 1.5, borderRadius: 3 }}>
+            PNG İndir
+          </Button>
+          <Button fullWidth variant="contained" color="secondary" startIcon={<PhotoLibrary />} onClick={() => downloadQR('jpg')} sx={{ py: 1.5, borderRadius: 3 }}>
+            JPG İndir
+          </Button>
+          <Button fullWidth variant="contained" color="success" startIcon={<Style />} onClick={() => downloadQR('svg')} sx={{ py: 1.5, borderRadius: 3 }}>
+            SVG İndir
+          </Button>
+        </Stack>
+
+        {/* QR Image */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            bgcolor: bgColor,
+            borderRadius: 6,
+            boxShadow: '0 30px 60px rgba(0,0,0,0.5)',
+            transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            '&:hover': { transform: 'scale(1.05) rotate(1deg)' }
+          }}
+        >
+          <QRCode
+            ref={qrRef}
+            value={qrData || 'Premium QR Studio'}
+            size={300}
+            quietZone={10}
+            qrStyle="squares"
+            eyeRadius={12}
+            fgColor={fgColor}
+            bgColor={bgColor}
+          />
+        </Paper>
+
+        {/* Customization Section (Now inside the preview component) */}
+        <Box sx={{ width: '100%', mt: 4, pt: 4, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="700" textAlign="center" sx={{ mb: 3 }}>
+            Tasarımı Özelleştir
+          </Typography>
+          <Stack direction="row" spacing={4} justifyContent="center" alignItems="center">
+            <Box textAlign="center">
+              <Typography variant="caption" color="text.secondary">QR Rengi</Typography>
+              <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
+                <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
+              </Box>
+            </Box>
+            <Box textAlign="center">
+              <Typography variant="caption" color="text.secondary">Arkaplan</Typography>
+              <Box sx={{ mt: 1, p: 0.5, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)', display: 'flex' }}>
+                <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} style={{ width: 40, height: 40, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }} />
+              </Box>
+            </Box>
+          </Stack>
+        </Box>
+      </Stack>
     </Fade>
   );
 }

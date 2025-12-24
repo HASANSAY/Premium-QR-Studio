@@ -11,14 +11,15 @@ interface Particle {
     opacity: number;
 }
 
-export default function ParticleBackground() {
+// Memoized Background for performance
+const ParticleBackgroundComponent = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: true });
         if (!ctx) return;
 
         // Canvas boyutunu ayarla
@@ -105,4 +106,6 @@ export default function ParticleBackground() {
             }}
         />
     );
-}
+};
+
+export default React.memo(ParticleBackgroundComponent);
