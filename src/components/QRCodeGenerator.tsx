@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { QRCode } from 'react-qrcode-logo';
 import QRCodeLib from 'qrcode';
 import {
@@ -88,6 +88,25 @@ export default function QRCodeGenerator() {
 
 
 
+  const isInputInvalid = useMemo(() => {
+    switch (tabValue) {
+      case 'url':
+        return !qrValue || !isValidUrl(qrValue);
+      case 'wifi':
+        return !wifiData.ssid;
+      case 'vcard':
+        return !vCardData.firstName;
+      case 'email':
+        return !emailData.email;
+      case 'phone':
+        return !phoneData;
+      case 'sms':
+        return !smsData.phone;
+      default:
+        return false;
+    }
+  }, [tabValue, qrValue, wifiData.ssid, vCardData.firstName, emailData.email, phoneData, smsData.phone]);
+
   const generateQR = async () => {
     if (tabValue === 'url' && !qrValue.trim()) {
       setError('Lütfen bir bağlantı girin');
@@ -123,6 +142,11 @@ export default function QRCodeGenerator() {
       setIsGenerated(true);
       addToHistory(tabValue, finalData);
       setSuccess(true);
+
+      // Umami Analytics Tracking
+      if (window.umami) {
+        window.umami.track('QR Generated', { type: tabValue });
+      }
     } catch (err) {
       console.error('QR Code generation error:', err);
       setError('QR Kod oluşturulurken bir hata oluştu.');
@@ -304,7 +328,7 @@ export default function QRCodeGenerator() {
                     size="large"
                     fullWidth
                     onClick={generateQR}
-                    disabled={loading || (tabValue === 'url' && (!qrValue || !isValidUrl(qrValue)))}
+                    disabled={loading || isInputInvalid}
                     sx={{
                       py: 2,
                       fontSize: '1.2rem',
@@ -430,52 +454,70 @@ function QRPreviewSection({ qrData }: { qrData: string }) {
               fullWidth
               variant="contained"
               startIcon={btn.icon}
-              onClick={() => downloadQR(btn.format as any)}
+              onClick={() => {
+                downloadQR(btn.format as any);
+                if (window.umami) {
+                  window.umami.track('QR Downloaded', { format: btn.format });
+                }
+              }}
               sx={{
                 py: 2,
-                borderRadius: 4,
+                borderRadius: 8, // More rounded for water drop feel
                 position: 'relative',
                 textTransform: 'none',
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                bgcolor: 'rgba(0, 0, 0, 0.6) !important',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                fontWeight: 900,
+                fontSize: '1rem',
+                bgcolor: 'rgba(255, 255, 255, 0.15) !important', // Very transparent
+                color: '#000000', // Solid black text
+                backdropFilter: 'blur(15px) saturate(180%)', // Liquid refraction
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+                boxShadow: `
+                  inset 0 0 20px rgba(255, 255, 255, 0.3),
+                  0 10px 20px rgba(0, 0, 0, 0.3)
+                `,
+                transition: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 overflow: 'hidden',
                 zIndex: 1,
+                '& .MuiButton-startIcon': { color: '#000000', mr: 1.5 },
+                // Specular Highlight (The 'sparkle' on a water drop)
                 '&::before': {
                   content: '""',
                   position: 'absolute',
-                  inset: -1,
-                  padding: '2px',
-                  borderRadius: 'inherit',
-                  background: `linear-gradient(45deg, ${btn.color}, #7c3aed, ${btn.color}, #00d2ff, ${btn.color})`,
-                  backgroundSize: '400% 400%',
-                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                  WebkitMaskComposite: 'xor',
-                  maskComposite: 'exclude',
-                  animation: 'borderRotate 4s linear infinite',
-                  opacity: 0.8,
+                  top: '10%',
+                  left: '15%',
+                  width: '40%',
+                  height: '20%',
+                  background: 'linear-gradient(to bottom, rgba(255,255,255,0.6), transparent)',
+                  borderRadius: '50%',
+                  zIndex: 2,
+                  pointerEvents: 'none',
                 },
+                // Animated Border
                 '&::after': {
                   content: '""',
                   position: 'absolute',
-                  inset: 0,
-                  bgcolor: btn.color,
-                  opacity: 0,
-                  transition: '0.3s',
-                  zIndex: -1,
+                  inset: -2,
+                  padding: '2px',
+                  borderRadius: 'inherit',
+                  background: `linear-gradient(45deg, transparent, ${btn.color}, transparent, #fff, transparent)`,
+                  backgroundSize: '200% 200%',
+                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  animation: 'liquidFlow 3s linear infinite',
+                  opacity: 0.6,
                 },
                 '&:hover': {
-                  transform: 'translateY(-3px)',
-                  boxShadow: `0 10px 30px ${btn.color}55`,
-                  '&::after': { opacity: 0.1 },
+                  transform: 'scale(1.05) translateY(-5px)',
+                  bgcolor: 'rgba(255, 255, 255, 0.25) !important',
+                  boxShadow: `
+                    inset 0 0 30px rgba(255, 255, 255, 0.5),
+                    0 20px 40px ${btn.color}44
+                  `,
                 },
-                '@keyframes borderRotate': {
+                '@keyframes liquidFlow': {
                   '0%': { backgroundPosition: '0% 50%' },
-                  '50%': { backgroundPosition: '100% 50%' },
-                  '100%': { backgroundPosition: '0% 50%' }
+                  '100%': { backgroundPosition: '200% 50%' }
                 }
               }}
             >
