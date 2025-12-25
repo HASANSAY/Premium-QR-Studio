@@ -166,7 +166,7 @@ export default function QRCodeGenerator() {
             {/* Header */}
             <Box textAlign="center">
               <Typography variant="h4" component="h1" gutterBottom fontWeight="800" sx={{ color: 'white' }}>
-                Premium QR Studio
+                Edesis Premium QR Studio
               </Typography>
               <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                 Tüm ihtiyaçlarınız için profesyonel QR kodları oluşturun
@@ -203,7 +203,7 @@ export default function QRCodeGenerator() {
 
                 {success && (
                   <Alert severity="success" sx={{ mb: 3 }}>
-                    QR Kodunuz hazır! Aşağıdan ince ayarlayıp indirebilirsiniz.
+                    QR Kodunuz hazır! Aşağıdan rengini ayarlayıp indirebilirsiniz.
                   </Alert>
                 )}
 
@@ -320,7 +320,7 @@ export default function QRCodeGenerator() {
                       '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 15px 30px rgba(124, 58, 237, 0.5)' }
                     }}
                   >
-                    {loading ? 'İşleniyor...' : (tabValue === 'url' ? 'QR Oluştur' : 'QR OLUŞTUR')}
+                    {loading ? 'İşleniyor...' : 'Qr Kod Oluştur'}
                   </Button>
                 </Stack>
               </Box>
@@ -385,7 +385,7 @@ export default function QRCodeGenerator() {
 
 // --- Isolated Preview Component for Performance ---
 function QRPreviewSection({ qrData }: { qrData: string }) {
-  const [fgColor, setFgColor] = useState('#000000');
+  const [fgColor, setFgColor] = useState('#BB1FDB');
   const [bgColor, setBgColor] = useState('#ffffff');
   const qrRef = useRef<any>(null);
 
@@ -418,17 +418,70 @@ function QRPreviewSection({ qrData }: { qrData: string }) {
   return (
     <Fade in>
       <Stack spacing={4} alignItems="center" sx={{ mt: 6, pt: 6, borderTop: '2px solid rgba(124, 58, 237, 0.2)' }}>
-        {/* Download Buttons */}
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ maxWidth: 600 }}>
-          <Button fullWidth variant="contained" color="primary" startIcon={<ImageIcon />} onClick={() => downloadQR('png')} sx={{ py: 1.5, borderRadius: 3 }}>
-            PNG İndir
-          </Button>
-          <Button fullWidth variant="contained" color="secondary" startIcon={<PhotoLibrary />} onClick={() => downloadQR('jpg')} sx={{ py: 1.5, borderRadius: 3 }}>
-            JPG İndir
-          </Button>
-          <Button fullWidth variant="contained" color="success" startIcon={<Style />} onClick={() => downloadQR('svg')} sx={{ py: 1.5, borderRadius: 3 }}>
-            SVG İndir
-          </Button>
+        {/* Download Buttons - Style 7: Gradient Border */}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} width="100%" sx={{ maxWidth: 660 }}>
+          {[
+            { format: 'png', label: 'PNG İndir', icon: <ImageIcon />, color: '#BB1FDB' },
+            { format: 'jpg', label: 'JPG İndir', icon: <PhotoLibrary />, color: '#00d2ff' },
+            { format: 'svg', label: 'SVG İndir', icon: <Style />, color: '#ff0080' }
+          ].map((btn) => (
+            <Button
+              key={btn.format}
+              fullWidth
+              variant="contained"
+              startIcon={btn.icon}
+              onClick={() => downloadQR(btn.format as any)}
+              sx={{
+                py: 2,
+                borderRadius: 4,
+                position: 'relative',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                bgcolor: 'rgba(0, 0, 0, 0.6) !important',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                transition: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                overflow: 'hidden',
+                zIndex: 1,
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: -1,
+                  padding: '2px',
+                  borderRadius: 'inherit',
+                  background: `linear-gradient(45deg, ${btn.color}, #7c3aed, ${btn.color}, #00d2ff, ${btn.color})`,
+                  backgroundSize: '400% 400%',
+                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  WebkitMaskComposite: 'xor',
+                  maskComposite: 'exclude',
+                  animation: 'borderRotate 4s linear infinite',
+                  opacity: 0.8,
+                },
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  bgcolor: btn.color,
+                  opacity: 0,
+                  transition: '0.3s',
+                  zIndex: -1,
+                },
+                '&:hover': {
+                  transform: 'translateY(-3px)',
+                  boxShadow: `0 10px 30px ${btn.color}55`,
+                  '&::after': { opacity: 0.1 },
+                },
+                '@keyframes borderRotate': {
+                  '0%': { backgroundPosition: '0% 50%' },
+                  '50%': { backgroundPosition: '100% 50%' },
+                  '100%': { backgroundPosition: '0% 50%' }
+                }
+              }}
+            >
+              {btn.label}
+            </Button>
+          ))}
         </Stack>
 
         {/* QR Image */}

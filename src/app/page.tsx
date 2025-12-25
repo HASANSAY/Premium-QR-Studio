@@ -69,7 +69,7 @@ export default function Home() {
           fontSize: '0.7rem',
         }}
       >
-        Premium QR Studio
+        Edesis Premium QR Studio
       </Typography>
     </Box>
   );

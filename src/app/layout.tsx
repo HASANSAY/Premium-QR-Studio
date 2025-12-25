@@ -6,12 +6,12 @@ import ClientProviders from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Premium QR Code Generator | Ücretsiz QR Kod Oluşturucu",
+  title: "Edesis Premium QR Code Generator | Ücretsiz QR Kod Oluşturucu",
   description: "Bağlantılarınızı saniyeler içinde profesyonel QR kodlara dönüştürün. Modern, hızlı ve tamamen ücretsiz QR kod oluşturucu.",
   keywords: ["qr kod", "qr code", "qr kod oluşturucu", "qr code generator", "ücretsiz qr kod"],
-  authors: [{ name: "Premium QR Studio" }],
-  creator: "Premium QR Studio",
-  publisher: "Premium QR Studio",
+  authors: [{ name: "Edesis Premium QR Studio" }],
+  creator: "Edesis Premium QR Studio",
+  publisher: "Edesis Premium QR Studio",
   robots: {
     index: true,
     follow: true,
@@ -20,13 +20,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "tr_TR",
     url: "https://qr-studio.com",
-    title: "Premium QR Code Generator",
+    title: "Edesis Premium QR Code Generator",
     description: "Bağlantılarınızı saniyeler içinde profesyonel QR kodlara dönüştürün",
-    siteName: "Premium QR Studio",
+    siteName: "Edesis Premium QR Studio",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Premium QR Code Generator",
+    title: "Edesis Premium QR Code Generator",
     description: "Bağlantılarınızı saniyeler içinde profesyonel QR kodlara dönüştürün",
   },
 };
