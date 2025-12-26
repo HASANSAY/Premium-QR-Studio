@@ -29,6 +29,10 @@ export const metadata: Metadata = {
     title: "Edesis Premium QR Code Generator",
     description: "Bağlantılarınızı saniyeler içinde profesyonel QR kodlara dönüştürün",
   },
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export const viewport: Viewport = {
@@ -46,8 +50,6 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="apple-touch-icon" href="/favicon.ico" />
         <script defer src="https://cloud.umami.is/script.js" data-website-id="73fa885b-56d3-4ed3-8e03-612cd13d6958"></script>
       </head>
       <body className={inter.className}>
