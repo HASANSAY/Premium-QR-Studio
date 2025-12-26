@@ -201,17 +201,23 @@ export default function QRCodeGenerator() {
             <Tabs
               value={tabValue}
               onChange={handleTabChange}
-              centered
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
               sx={{
+                width: '100%',
                 borderBottom: 1,
                 borderColor: 'divider',
-                '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' }
+                '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+                '& .MuiTabs-flexContainer': {
+                  justifyContent: { xs: 'flex-start', md: 'center' }
+                }
               }}
             >
               <Tab icon={<LinkIcon />} label="URL" value="url" />
-              <Tab icon={<Phone sx={{ fontSize: 20 }} />} label="Telefon" value="phone" />
-              <Tab icon={<ContactPhone sx={{ fontSize: 20 }} />} label="VCard" value="vcard" />
               <Tab icon={<Sms sx={{ fontSize: 20 }} />} label="SMS" value="sms" />
+              <Tab icon={<ContactPhone sx={{ fontSize: 20 }} />} label="VCard" value="vcard" />
+              <Tab icon={<Phone sx={{ fontSize: 20 }} />} label="Telefon" value="phone" />
               <Tab icon={<Wifi sx={{ fontSize: 20 }} />} label="WiFi" value="wifi" />
             </Tabs>
 
